@@ -41,13 +41,10 @@ class LLMService:
         """
         Process streaming response from LLM
         """
-        print("Processing streaming response...")
-
         for line in response.iter_lines():
             if not line:
                 continue
             line_text = line.decode("utf-8")
-            print("Decoded line:", line_text)
             if line_text.startswith('data:'):
                 json_str = line_text[5:].strip()
 
@@ -87,7 +84,6 @@ class LLMService:
                 headers={"Content-Type": "application/json"},
                 stream=True,
             )
-            print("LLM response", response)
             if response.status_code != 200:
                 yield LLMService.format_sse({
                     'error': f"LLM request failed with status code {response.status_code}"
@@ -100,6 +96,7 @@ class LLMService:
             yield LLMService.format_sse({'status': 'complete'})
 
         except requests.RequestException as e:
+            print("RequestException:", e)
             yield LLMService.format_sse({'error': str(e)})
         except Exception as e:
             yield LLMService.format_sse({'error': f"Unexpected error: {str(e)}"})

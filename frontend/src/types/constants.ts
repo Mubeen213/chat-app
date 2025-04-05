@@ -1,5 +1,3 @@
-
-
 export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5010',
   ENDPOINTS: {
@@ -8,10 +6,10 @@ export const API_CONFIG = {
   TIMEOUT: 30000
 }
 
-
 export const UI_CONFIG = {
   MAX_INPUT_HEIGHT: 200,
   MAX_SCROLL_THRESHOLD: 100,
+  AUTO_SCROLL_THRESHOLD: 100,
   TYPING_INDICATOR_DELAY: 300
 }
 export const SYSTEM_MESSAGES = {
