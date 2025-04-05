@@ -1,0 +1,73 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# C extensions
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/xw
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+pythonenv*
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+.spyderproject
+.spyproject
+.ropeproject
+
+# Flask specific
+instance/
+.webassets-cache
+
+# Environments and config files
+*.env
+*.env.local
+*.env.development
+*.env.test
+*.env.production
+.flaskenv
+
+# Debug logs
+*.log
+logs/
+debug.log
+
+# OS specific files
+.DS_Store
+Thumbs.db
+.directory
+*.lnk
+
+# Project-specific settings
+config.py
+!example_config.py
+
+# Dependency caches
+pip-log.txt
+pip-delete-this-directory.txt
