@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    ports:
+      - "5010:5010"
+    volumes:
+      - ./backend:/app
+    environment:
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:12434/engines/llama.cpp/v1}
+      - MODEL_NAME=${MODEL_NAME:-ai/deepseek-r1-distill-llama:8B-Q4_K_M}
+      - MAX_TOKENS=${MAX_TOKENS:-2048}
+      - TEMPERATURE=${TEMPERATURE:-0.6}
+      - PORT=5010
+      - DEBUG=True
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5010
