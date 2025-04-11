@@ -1,4 +1,5 @@
-## Chat Application for local LLMs
+## Smart Flight booking via natural language processing using model context protocol.
+
 
 # Role: Staff Software Enginner who has built many scalable AI applications.
 
@@ -25,7 +26,7 @@ our frontend will be in react typescriipt with tailwindcss and backend in python
 ## Considerations:
 - Latest version of react and other dependencies at stable version.
 - Always provide installtion process when using external libraries.
-- Later on, we will docekerize both frontend and backend and opensource the project.
+- Consider the current state of project before proceeding further.
 
 ## Output format:
 - A thorough plan for solution presented with step by step process with proper reasoning.

@@ -2,20 +2,22 @@ from typing import Dict, Any, Generator
 import config
 import requests
 import json
-
+from handler import HandleToolCalls
 
 class LLMService:
   """Service to handle LLM requests."""
 
   @staticmethod
-  def create_prompt(prompt: str, stream=False) -> Dict[str, Any]:
+  def create_prompt(prompt: str, tools: list= None) -> Dict[str, Any]:
         """
         Create prompt for LLM request using chat completions format
         """
         messages = [
             {
                 "role": "system",
-                "content": "You are a helpful assistant."
+                "content": "You are a Travel agent assistant that helps in booking flights only."
+                "Try to have a conversation and seek clarifications if needed.Ask questions like what time would you prefer? Say something good about the place they are searching for. Help them plan a trip and give suggestions."
+                "Tell time what time feels pleasant at the places they are searching for if needed.  Please use the tools provided to assist the user. When the user search with locations, convert them to standard airport codes. The talk MUST only be around travel "
             },
             {
                 "role": "user",
@@ -23,18 +25,21 @@ class LLMService:
             }
         ]
 
-        return {
-            "model": config.MODEL_NAME,
-            "messages": messages,
-            "temperature": config.TEMPERATURE,
-            "stream": stream
-        }
+        request_body = {
+                "model": config.MODEL_NAME,
+                "messages": messages,
+                "temperature": config.TEMPERATURE
+            }
+
+        if tools:
+            request_body["tools"] = tools
+
+        return request_body
 
   @staticmethod
   def format_sse(data: Dict[str, Any]) -> str:
       """Format data as Server-Sent Event"""
       return f"data: {json.dumps(data)}\n\n"
-
 
   @staticmethod
   def process_streaming_response(response: requests.Response) -> Generator[str, None, None]:
@@ -72,26 +77,25 @@ class LLMService:
 
   @staticmethod
   def stream_response(prompt: str) -> Generator[str, None, None]:
-        """
+        """                
         Stream response from LLM
         """
-        llm_data = LLMService.create_prompt(prompt, stream=True)
+        llm_data = LLMService.create_prompt(prompt)
 
         try:
             response = requests.post(
                 f"{config.LLM_BASE_URL}/chat/completions",
                 json=llm_data,
-                headers={"Content-Type": "application/json"},
-                stream=True,
+                headers={"Content-Type": "application/json"},                            
             )
             if response.status_code != 200:
                 yield LLMService.format_sse({
                     'error': f"LLM request failed with status code {response.status_code}"
-                })
-                return
-
+                })                                                                                                              
+                return                                              
+                                                                 
             for token_event in LLMService.process_streaming_response(response):
-                yield token_event
+                yield token_event              
 
             yield LLMService.format_sse({'status': 'complete'})
 
@@ -107,7 +111,7 @@ class LLMService:
         """
         Get complete response from LLM (non-streaming)
         """
-        llm_data = LLMService.create_prompt(prompt, stream=False)
+        llm_data = LLMService.create_prompt(prompt)
 
         try:
             response = requests.post(
@@ -131,3 +135,104 @@ class LLMService:
 
         except Exception as e:
             return {"error": str(e)}
+
+  @staticmethod
+  def get_completion_tools(prompt: str, tools: list = None) -> Dict[str, Any]:
+        """
+        Get complete response from LLM (non-streaming), with optional tool support.
+        """
+        llm_data = LLMService.create_prompt(prompt, tools=tools)
+
+        try:
+            # Step 1: Initial LLM request
+            response = LLMService._send_llm_request(llm_data)
+            if "error" in response:
+                return response
+            print(f"LLM response: {response.json()}")
+            result = response.json()
+            choice = result.get("choices", [{}])[0]
+
+            # Step 2: Handle tool calls if present
+            if "message" in choice and "tool_calls" in choice["message"]:
+                return LLMService._handle_tool_calls(choice, llm_data)
+
+            # Step 3: Handle normal assistant reply
+            if "message" in choice and "content" in choice["message"]:
+                return {"content": choice["message"]["content"]}
+
+            return {"error": "No valid message or tool call in response"}
+
+        except Exception as e:
+            return {"error": str(e)}
+
+  @staticmethod
+  def _send_llm_request(llm_data: Dict[str, Any]) -> requests.Response:
+        """
+        Send a request to the LLM and return the response.
+        """
+        try:
+            response = requests.post(
+                f"{config.LLM_BASE_URL}/chat/completions",
+                json=llm_data,
+                headers={"Content-Type": "application/json"},
+            )
+            if response.status_code != 200:
+                return {"error": f"LLM request failed with status code {response.status_code}"}
+            return response
+        except requests.RequestException as e:
+            return {"error": f"Request error: {str(e)}"}
+
+  @staticmethod
+  def _handle_tool_calls(choice: Dict[str, Any], llm_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process tool calls and handle follow-up requests.
+        """
+        try:
+            tool_call = choice["message"]["tool_calls"][0]
+            tool_result = HandleToolCalls.handle_tool_call(tool_call)
+
+            return tool_result
+            # Update conversation with tool call result
+            # LLMService._update_conversation_with_tool_result(llm_data, tool_call, tool_result)
+
+            # # Send follow-up request to LLM
+            # follow_up_response = LLMService._send_llm_request(llm_data)
+            # if "error" in follow_up_response:
+            #     return follow_up_response
+
+            # follow_up_result = follow_up_response.json()
+            # follow_up_choice = follow_up_result.get("choices", [{}])[0]
+
+            # if "message" in follow_up_choice and "content" in follow_up_choice["message"]:
+            #     return {"content": follow_up_choice["message"]["content"]}
+
+            # return {"error": "No valid response in follow-up"}
+
+        except Exception as e:
+            return {"error": f"Tool call handling error: {str(e)}"}
+
+  @staticmethod
+  def _update_conversation_with_tool_result(llm_data: Dict[str, Any], tool_call: Dict[str, Any], tool_result: Any):
+        """
+        Update the conversation data with the tool call result.
+        """
+        llm_data["messages"].append({
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": tool_call["id"],
+                    "type": tool_call["type"],
+                    "function": {
+                        "name": tool_call["function"]["name"],
+                        "arguments": tool_call["function"]["arguments"]
+                    }
+                }
+            ]
+        })
+
+        llm_data["messages"].append({
+            "role": "tool",
+            "tool_call_id": tool_call["id"],
+            "content": json.dumps(tool_result)
+        })
