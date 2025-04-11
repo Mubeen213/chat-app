@@ -14,15 +14,13 @@ class LLMService:
         """
         system_prompt = """
         You are a friendly and knowledgeable travel assistant that helps users book flights and plan their trips.
-
-        Your goal is to engage in a helpful and conversational way. Always seek clarifications when needed. For example, ask questions like:
-        - "What date would you prefer to fly?"
-        - When booking a flight or searching for flights, always and must ask for source, destination, and departure date.
-
+        Do not ask for retyrn dates
+        Your goal is to engage in a helpful and conversational way.
+        If year is not given consider the year as 2025
         Say something nice or interesting about the destinations users mention — help them get excited about their trip. Offer useful travel suggestions and help them plan with ease. If the user seems unsure about timing, share when the weather is most pleasant in that location.
-
+        Date format for 'search_flights' function is 'DD Month, YYYY' (e.g., '01 Jun, 2025').
         Always convert locations into standard airport codes before proceeding. Use the provided tools to search for flights.
-
+        If the user asks for a specific flight, provide the details in a clear and concise manner.
         IMPORTANT: You should only talk about topics related to travel and flight booking.
         """
 
@@ -166,7 +164,7 @@ class LLMService:
 
             # Step 2: Handle tool calls if present
             if "message" in choice and "tool_calls" in choice["message"]:
-                return LLMService._handle_tool_calls(choice, llm_data)
+                return LLMService._handle_tool_calls(prompt, choice, llm_data)
 
             # Step 3: Handle normal assistant reply
             if "message" in choice and "content" in choice["message"]:
@@ -175,7 +173,7 @@ class LLMService:
             return {"error": "No valid message or tool call in response"}
 
         except Exception as e:
-            return {"error": str(e)}
+            return {"error": str(e)}, 500
 
   @staticmethod
   def _send_llm_request(llm_data: Dict[str, Any]) -> requests.Response:
@@ -192,36 +190,61 @@ class LLMService:
                 return {"error": f"LLM request failed with status code {response.status_code}"}
             return response
         except requests.RequestException as e:
-            return {"error": f"Request error: {str(e)}"}
+            return {"error": f"Request error: {str(e)}"}, 500
+        
+  @staticmethod
+  def _summarise_flight_search_response(prompt, tool_result):
+    """
+    Summarise the tool response by the LLM.
+    Show the cheapest flight option.
+    Show the fastest flight option.
+    Provide a brief summary of the flight search results.
+    """
+    prompt = """
+    You are a helpful travel assistant."""
+
+    try:
+        summary_prompt = """
+            Summarise the following tool response for which User's query was :{prompt} \n\n
+            and flight search response was  : {tool_result} \n\n
+            Do not provide any message in response like based on JSON data provided etc.
+            Do not provide any imformation which is not present in response like mismatched
+            dates from User query etc.
+            Provide a very breif summary from the flight search results.
+            Show the cheapest flight option.
+            Show the fastest flight option.
+              """
+        llm_data = LLMService.create_prompt(
+            summary_prompt
+        )
+        # Send follow-up request to LLM
+        print(f"Summarising flight search response with {len(tool_result)} items...")
+        follow_up_response = LLMService._send_llm_request(llm_data)
+
+        # Extract and return only the content from the response
+        follow_up_result = follow_up_response.json()
+        if 'choices' in follow_up_result and len(follow_up_result['choices']) > 0:
+            message = follow_up_result['choices'][0].get('message', {})
+            content = message.get('content', '')
+            return content
+
+        return {"error": "No valid content in follow-up response"}, 500
+
+    except Exception as e:
+        print(f"Error creating prompt: {str(e)}")
+        return {"error": f"Error creating prompt: {str(e)}"}, 500
 
   @staticmethod
-  def _handle_tool_calls(choice: Dict[str, Any], llm_data: Dict[str, Any]) -> Dict[str, Any]:
+  def _handle_tool_calls(prompt:str, choice: Dict[str, Any], llm_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process tool calls and handle follow-up requests.
         """
         try:
             tool_call = choice["message"]["tool_calls"][0]
             tool_result = HandleToolCalls.handle_tool_call(tool_call)
-
             return tool_result
-            # Update conversation with tool call result
-            # LLMService._update_conversation_with_tool_result(llm_data, tool_call, tool_result)
-
-            # # Send follow-up request to LLM
-            # follow_up_response = LLMService._send_llm_request(llm_data)
-            # if "error" in follow_up_response:
-            #     return follow_up_response
-
-            # follow_up_result = follow_up_response.json()
-            # follow_up_choice = follow_up_result.get("choices", [{}])[0]
-
-            # if "message" in follow_up_choice and "content" in follow_up_choice["message"]:
-            #     return {"content": follow_up_choice["message"]["content"]}
-
-            # return {"error": "No valid response in follow-up"}
-
         except Exception as e:
-            return {"error": f"Tool call handling error: {str(e)}"}
+            return {"error": f"Tool call handling error: {str(e)}"}, 500
 
   @staticmethod
   def _update_conversation_with_tool_result(llm_data: Dict[str, Any], tool_call: Dict[str, Any], tool_result: Any):

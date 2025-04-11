@@ -78,17 +78,17 @@ class HandleToolCalls:
             response = requests.get(api_url)
 
             if response.status_code != 200:
-                return {"error": f"Flight search failed with status code {response.status_code}"}
+                return {"error": f"Flight search failed with status code {response.status_code}"}, response.status_code
 
             # Return the API response as JSON
             return response.json()
 
         except requests.RequestException as e:
             logger.error(f"RequestException while searching flights: {str(e)}")
-            return {"error": f"RequestException: {str(e)}"}
+            return {"error": f"RequestException: {str(e)}"}, 500
         except Exception as e:
             logger.error(f"Unexpected error while searching flights: {str(e)}")
-            return {"error": f"Unexpected error: {str(e)}"}
+            return {"error": f"Unexpected error: {str(e)}"}, 500
 
     @staticmethod
     def handle_tool_call(tool_call: Dict[str, Any]) -> Dict[str, Any]:
@@ -121,4 +121,4 @@ class HandleToolCalls:
 
         except Exception as e:
             logger.error(f"Error handling tool call: {str(e)}")
-            return {"error": f"Error handling tool call: {str(e)}"}
+            return {"error": f"Error handling tool call: {str(e)}"}, 500
